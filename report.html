@@ -231,10 +231,10 @@
                         queryConfig.push({
                             type : typeArray[i],
                             key  : keyArray[i],
-                            query:  rally.sdk.util.Query.and(['Iteration.StartDate >= "' + releaseDropdown.getSelectedStart() + '"',
-                                'Iteration.StartDate <= "' + releaseDropdown.getSelectedEnd() + '"']).or(
-                                    rally.sdk.util.Query.and(['Iteration.EndDate >= "' + releaseDropdown.getSelectedStart() + '"',
-                                        'Iteration.EndDate <= "' + releaseDropdown.getSelectedEnd() + '"'])),
+                            query:  rally.sdk.util.Query.and(
+                                ['Iteration.StartDate >= "' + releaseDropdown.getSelectedStart() + '"', 'Iteration.StartDate <= "' + releaseDropdown.getSelectedEnd() + '"']).or(
+                                rally.sdk.util.Query.and(
+                                    ['Iteration.EndDate >= "' + releaseDropdown.getSelectedStart() + '"', 'Iteration.EndDate <= "' + releaseDropdown.getSelectedEnd() + '"'])),
                             fetch: 'Name,Iteration,ScheduleState,PlanEstimate'
                         });
                     });
