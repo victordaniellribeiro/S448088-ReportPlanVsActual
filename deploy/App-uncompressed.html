@@ -164,10 +164,11 @@
                             StartDate:      iteration.get('StartDate'),
                             EndDate:        iteration.get('EndDate'),
                             PlannedVelocity:      plannedVelocity,
-                            PlanEstimate:   0,
+                            SlottedVelocity:   0,
                             ActualVelocity: 0,
+                            PlannedVelocityBurndown:0,
+                            SlottedBurndown:0,
                             ActualBurndown: 0,
-                            PlannedBurndown:0,
                             IsFuture:       ""};
 
                     }, this);
@@ -178,10 +179,10 @@
                         StartDate:      "",
                         EndDate:        "",
                         Resources:      "",
-                        PlanEstimate:   "",
+                        SlottedVelocity:   "",
                         ActualVelocity: "",
+                        PlannedVelocityBurndown:0,
                         ActualBurndown: 0,
-                        PlannedBurndown:0,
                         IsFuture:       ""};
 
                     //console.log('_iterations:', that._iterations);
@@ -271,7 +272,7 @@
 
         _.each(allStoriesDefectsDefectSuites, function(item) { //aggregate story, defect, & defect suite data
             var estimate = item.get('PlanEstimate') || 0;
-            this._iterations[item.get('Iteration').Name].PlanEstimate += estimate;
+            this._iterations[item.get('Iteration').Name].SlottedVelocity += estimate;
             releasePlanEstimate += estimate;
             if (item.get('ScheduleState') === 'Accepted' || item.get('ScheduleState') === 'Ready to Ship') {
                 this._iterations[item.get('Iteration').Name].ActualVelocity += estimate;
@@ -286,7 +287,7 @@
 
 
     _aggregateBurndown: function(releasePlanEstimate) {
-        var actualBurndown, plannedBurndown, future, lastPlannedVelocity, lastActualVelocity;
+        var actualBurndown, slottedBurndown, plannedBurndown, future, lastPlannedVelocity, lastActualVelocity, lastSlottedVelocity;
         var today = new Date();
         var i = 1;
 
@@ -300,6 +301,7 @@
             if (i === 1) {
                 actualBurndown = releasePlanEstimate;
                 plannedBurndown = releasePlanEstimate;
+                slottedBurndown = releasePlanEstimate;
                 future = value.EndDate >= today;
             /* The final row shows the state of the release after the
              completion of the last iteration. */
@@ -307,9 +309,11 @@
                 if (future) {
                     actualBurndown -= lastPlannedVelocity;
                     plannedBurndown -= lastPlannedVelocity;
+                    slottedBurndown -= lastSlottedVelocity;
                 } else {
                     actualBurndown -= lastActualVelocity;
                     plannedBurndown -= lastPlannedVelocity;
+                    slottedBurndown -= lastSlottedVelocity;
                 }
             /* if the PREVIOUS iteration has NOT been completed,
              use the -planned- velocity of that iteration
@@ -318,6 +322,7 @@
             } else if (future) {
                 actualBurndown -= lastPlannedVelocity;
                 plannedBurndown -= lastPlannedVelocity;
+                slottedBurndown -= lastSlottedVelocity;
                 future = true;
             /* if the PREVIOUS iteration HAS been completed,
              use the -actual- velocity of that iteration
@@ -326,13 +331,16 @@
             } else {         // past iteration
                 actualBurndown -= lastActualVelocity;
                 plannedBurndown -= lastPlannedVelocity;
+                slottedBurndown -= lastSlottedVelocity;
                 future = false;
             }
             future = value.EndDate >= today;
             lastPlannedVelocity = value.PlannedVelocity;
             lastActualVelocity = value.ActualVelocity;
+            lastSlottedVelocity = value.SlottedVelocity;
+            this._iterations[value.Name].PlannedVelocityBurndown = plannedBurndown;
+            this._iterations[value.Name].SlottedBurndown = slottedBurndown;
             this._iterations[value.Name].ActualBurndown = actualBurndown;
-            this._iterations[value.Name].PlannedBurndown = plannedBurndown;
             this._iterations[value.Name].IsFuture = future;
             i++;
         }, this);
@@ -342,6 +350,8 @@
 
     _showTable: function(releasePlanEstimate) {
     	//console.log('iterations final:', this._iterations);
+
+    	var releaseMinimum = 0;
 
     	var data = [];
 
@@ -353,16 +363,17 @@
 				StartDate: value.StartDate,
 				EndDate: value.EndDate,
 				PlannedVelocity: value.PlannedVelocity,
-				PlanEstimate: value.PlanEstimate,
+				SlottedVelocity: value.SlottedVelocity,
 				ActualVelocity: value.ActualVelocity,
+				PlannedVelocityBurndown: value.PlannedVelocityBurndown,
+				SlottedBurndown: value.SlottedBurndown,
 				ActualBurndown: value.ActualBurndown,
-				PlannedBurndown: value.PlannedBurndown,
 				IsFuture: value.IsFuture
 			});
 		}, this);
 
     	var featureStore = Ext.create('Ext.data.JsonStore', {
-			fields: ['Name', 'StartDate', 'EndDate', 'PlannedVelocity', 'PlanEstimate', 'ActualVelocity', 'ActualBurndown', 'PlannedBurndown', 'IsFuture']
+			fields: ['Name', 'StartDate', 'EndDate', 'PlannedVelocity', 'SlottedVelocity', 'ActualVelocity', 'PlannedVelocityBurndown', 'SlottedBurndown', 'ActualBurndown',  'IsFuture']
 		});
 
 		featureStore.loadData(data);
@@ -370,7 +381,7 @@
 		//console.log('data:', data);
 
 		var featuresGrid = Ext.create('Ext.grid.Panel', {
-			width: 880,
+			width: 1280,
 			viewConfig: {
 				stripeRows: true,
 				enableTextSelection: true
@@ -396,37 +407,212 @@
 				sortable: true,
 				dataIndex: 'EndDate'
 			}, {
-				text: 'Plan Estimate',
+				text: 'Planned Velocity',
 				flex: 1,
 				sortable: true,
-				dataIndex: 'PlanEstimate'
+				dataIndex: 'PlannedVelocity'
+			}, {
+				text: 'SlottedVelocity',
+				flex: 1,
+				sortable: true,
+				dataIndex: 'SlottedVelocity'
 			}, {
 				text: 'Actual Velocity',
 				flex: 1,
 				sortable: true,
 				dataIndex: 'ActualVelocity'
 			}, {
-				text: 'Planned Velocity',
+				text: 'Planned Velocity Burndown',
 				flex: 1,
 				sortable: true,
-				dataIndex: 'PlannedVelocity'
+				dataIndex: 'PlannedVelocityBurndown'
 			}, {
 				text: 'Actual Burndown',
 				flex: 1,
 				sortable: true,
 				dataIndex: 'ActualBurndown'
 			}, {
-				text: 'Planned Burndown',
+				text: 'Slotted Burndown',
 				flex: 1,
 				sortable: true,
-				dataIndex: 'PlannedBurndown'
+				dataIndex: 'SlottedBurndown'
 			}]
 		});
 
 		this.down('#bodyContainer').removeAll(true);
 		this.down('#bodyContainer').add(featuresGrid);
 
+
+		this._showGraph();
+
 		this.myMask.hide();
+    },
+
+
+    _loadGraphData: function() {
+    	var data = [];
+
+    	_.each(this._iterations, function(value) {
+			//console.log('item', value);
+			if (value.Name == 'Release') {
+				console.log('minimum:', value.PlannedVelocityBurndown);
+			}
+
+			data.push({
+				Name: value.Name,
+				PlannedVelocityBurndown: value.PlannedVelocityBurndown,
+				SlottedBurndown: value.SlottedBurndown,
+				ActualBurndown: value.ActualBurndown,
+				Zeros: 0				
+			});
+		}, this);
+
+    	var store = Ext.create('Ext.data.JsonStore', {
+            fields: ['Name', 'PlannedVelocityBurndown', 'SlottedBurndown', 'ActualBurndown', 'Zeros'],
+            data: data
+        });
+
+		return store;
+
+    },
+
+    _showGraph: function() {
+		var store = this._loadGraphData();
+
+		var releaseMinimum = this._iterations['Release'].PlannedVelocityBurndown;
+
+
+    	var chart = Ext.create('Ext.chart.Chart', {
+		    width: 1280,
+            height: 410,
+            padding: '10 0 0 0',
+            style: 'background : #fff;',
+            animate: true,
+            shadow: false,
+            store: store,
+            insetPadding: 40,
+            legend: {
+                position: 'right',
+                boxStrokeWidth: 0,
+                labelFont: '12px Helvetica'
+            },
+            axes: [{
+                type: 'numeric',
+                fields: ['PlannedVelocityBurndown', 'SlottedBurndown', 'ActualBurndown' ],
+                position: 'left',
+                grid: true,
+                minimum: releaseMinimum,
+                label: {
+                    renderer: function(v) { return v; }
+                }
+            }, {
+                type: 'category',
+                fields: 'Name',
+                position: 'bottom',
+                grid: true,
+                label: {
+                    rotate: {
+                        degrees: -45
+                    }
+                }
+            }],
+
+            items: [{
+                type: 'text',
+                text: 'Release Plan Estimate:' + 1000,
+                font: '12px Helvetica',
+                x: 12,
+                y: 390
+            }],
+            
+            series: [{
+                type: 'line',
+                axis: 'left',
+                title: 'Planned Velocity Burndown',
+                xField: 'Name',
+                yField: 'PlannedVelocityBurndown',
+                style: {
+                    //stroke: '#FF3333',
+			    	'stroke-dasharray': [9,5], //ignored in browsers that don't support SVG (and IE9)..
+			        'stroke-width': 1,
+			        opacity: 1
+                },
+                markerConfig: {
+                    radius: 2
+                },
+                highlight: {
+                    fill: '#000',
+                    radius: 2,
+                    'stroke-width': 2,
+                    stroke: '#fff'
+                },
+                tips: {
+                    trackMouse: true,
+                    style: 'background: #FFF',
+                    height: 20,
+                    // showDelay: 0,
+                    // dismissDelay: 0,
+                    // hideDelay: 0,
+                    renderer: function(storeItem, item) {
+                        this.setTitle(storeItem.get('Name') + ': ' + storeItem.get('PlannedVelocityBurndown'));
+                    }
+                }
+            },
+            {
+                type: 'line',
+                axis: 'left',
+                title: 'Actual Burndown',
+                xField: 'Name',
+                yField: 'ActualBurndown',
+                style: {
+                    'stroke-width': 1
+                },
+                markerConfig: {
+                    radius: 2
+                },
+                highlight: {
+                    fill: '#000',
+                    radius: 2,
+                    'stroke-width': 2,
+                    stroke: '#fff'
+                },
+                tips: {
+                    trackMouse: true,
+                    style: 'background: #FFF',
+                    height: 20,
+                    // showDelay: 0,
+                    // dismissDelay: 0,
+                    // hideDelay: 0,
+                    renderer: function(storeItem, item) {
+                        this.setTitle(storeItem.get('Name') + ': ' + storeItem.get('ActualBurndown'));
+                    }
+                }
+            },
+            {
+                type: 'line',
+                axis: 'left',
+                title: '',
+                xField: 'Name',
+                yField: 'Zeros',
+                showMarkers: false,
+                style: {
+                    stroke: '#000',
+			        opacity: 1
+                },
+                markerConfig: {
+                    radius: 1
+                },
+                highlight: {
+                    fill: '#000',
+                    radius: 1,
+                    'stroke-width': 1,
+                    stroke: '#fff'
+                }
+            }]
+		});
+
+		this.down('#bodyContainer').add(chart);
+
     }
 });
 
