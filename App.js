@@ -434,7 +434,7 @@ Ext.define('CustomApp', {
 		this.down('#bodyContainer').add(featuresGrid);
 
 
-		this._showGraph();
+		this._showGraph(releasePlanEstimate);
 
 		this.myMask.hide();
     },
@@ -467,7 +467,7 @@ Ext.define('CustomApp', {
 
     },
 
-    _showGraph: function() {
+    _showGraph: function(releasePlanEstimate) {
 		var store = this._loadGraphData();
 
 		var releaseMinimum = this._iterations['Release'].PlannedVelocityBurndown;
@@ -510,7 +510,7 @@ Ext.define('CustomApp', {
 
             items: [{
                 type: 'text',
-                text: 'Release Plan Estimate:' + 1000,
+                text: 'Release Plan Estimate:' + releasePlanEstimate,
                 font: '12px Helvetica',
                 x: 12,
                 y: 390
